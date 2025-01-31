@@ -120,12 +120,6 @@ npm run dev
 
 ---
 
-## 📜 License
-
-This project is **open-source** under the **MIT License**.
-
----
-
 ## ✨ Contributing
 
 Want to improve this project? Contributions are welcome!
