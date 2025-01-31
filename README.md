@@ -37,7 +37,7 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 ### 1️⃣ **Clone the Repository**
 
 ```sh
-git clone https://github.com/mahaveergurjare/Minor-Project.git
+git clone https://github.com/mahaveergurjar/Minor-Project.git
 cd Minor-Project
 ```
 
