@@ -5,6 +5,10 @@ from pydub import AudioSegment
 import yt_dlp
 import torch
 import os
+import spacy
+# import graphviz
+from collections import defaultdict, Counter
+# from IPython.display import display, Image
 
 app = Flask(__name__)
 CORS(app)
@@ -26,6 +30,9 @@ summarizer = pipeline(
     device=device,
     framework="pt"
 )
+
+# Load NLP model for keyword extraction
+nlp = spacy.load("en_core_web_sm")
 
 def download_audio(video_url):
     ydl_opts = {
@@ -62,12 +69,94 @@ def process_audio_chunks(audio_chunks):
         summaries.append(summary[0]['summary_text'])
     return summaries
 
+def generate_mind_map(summary_text):
+    doc = nlp(summary_text)
+    nodes = []
+    links = []
+    keyword_map = defaultdict(set)
+    
+    main_topics = set()
+    
+    # Extract key topics and relationships
+    for token in doc:
+        if token.pos_ in ["NOUN", "PROPN"]:  # Focus on nouns & proper nouns
+            parent = token.head.text
+            if parent != token.text:  # Avoid self-links
+                keyword_map[parent].add(token.text)
+                main_topics.add(parent)
+
+    # Build nodes and links
+    seen_nodes = set()
+    for main_topic in main_topics:
+        main_id = f"node-{main_topic}"
+        if main_id not in seen_nodes:
+            nodes.append({"id": main_id, "name": main_topic, "type": "heading"})
+            seen_nodes.add(main_id)
+
+        for sub in keyword_map[main_topic]:
+            sub_id = f"node-{sub}"
+            if sub_id not in seen_nodes:
+                nodes.append({"id": sub_id, "name": sub, "type": "subtopic"})
+                seen_nodes.add(sub_id)
+            links.append({"source": main_id, "target": sub_id})
+
+    return {"nodes": nodes, "links": links}
+
+def extract_topic(text):
+    doc = nlp(text)
+
+    # Extract nouns and proper nouns
+    words = [token.text for token in doc if token.pos_ in ["NOUN", "PROPN"] and not token.is_stop]
+
+    # Count occurrences of each noun
+    word_freq = Counter(words)
+
+    # Prioritize words appearing in the first sentence(s)
+    first_sentences = list(doc.sents)[:2]  # Look at the first two sentences
+    first_mentions = [token.text for sent in first_sentences for token in sent if token.pos_ in ["NOUN", "PROPN"]]
+
+    # Give extra weight to early mentions
+    for word in first_mentions:
+        word_freq[word] += 3  # Boost early mentions
+
+    # Select the most frequently mentioned word
+    main_topic = word_freq.most_common(1)
+
+    return main_topic[0][0] if main_topic else "Unknown Topic"
+
+def extract_sentences(summary):
+    doc = nlp(summary)
+    return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
+
+def extract_main_topics(text, top_n=6):
+    doc = nlp(text)
+    entities = [ent.text for ent in doc.ents if ent.label_ in ['ORG', 'PERSON', 'GPE', 'LOC', 'PRODUCT']]
+    entity_freq = Counter(entities)
+
+    if entity_freq:
+        main_topics = [topic for topic, _ in entity_freq.most_common(top_n)]
+    else:
+        words = [token.text for token in doc if token.is_alpha and not token.is_stop]
+        word_freq = Counter(words)
+        main_topics = [word for word, _ in word_freq.most_common(top_n)]
+
+    return main_topics
+
+def find_sentence_relations(keywords, sentences, max_sentences=5):
+    keyword_sentences = defaultdict(list)
+    for sentence in sentences:
+        for keyword in keywords:
+            if keyword.lower() in sentence.lower():
+                if len(keyword_sentences[keyword]) < max_sentences:
+                    keyword_sentences[keyword].append(sentence)
+    return keyword_sentences
+
+
 @app.route("/summarize", methods=["POST"])
 def summarize_video():
     try:
         data = request.get_json()
         video_url = data.get("video_url")
-        # video_url = "https://youtu.be/-bt_y4Loofg?feature=shared"
         if not video_url:
             return jsonify({"error": "Missing video_url"}), 400
         
@@ -79,7 +168,28 @@ def summarize_video():
         for chunk in chunks:
             os.remove(chunk)
         
-        return jsonify({"summary": " ".join(all_summaries)})
+        full_summary = " ".join(all_summaries)
+        mind_map_data = generate_mind_map(full_summary)
+        points = extract_sentences(full_summary)
+        text_data = "\n".join(points)
+
+        # Extract main topics (keywords)
+        main_topics = extract_main_topics(text_data)
+
+        # Find relationships between keywords and sentences
+        keyword_sentences = find_sentence_relations(main_topics, points)
+        topic = extract_topic(full_summary)
+
+        print(topic)
+        print(keyword_sentences)
+
+        return jsonify({
+            "summary": full_summary,
+            "mind_map": keyword_sentences,
+            # "keyValue": keyword_sentences,
+            "central": topic
+        })
+    
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
