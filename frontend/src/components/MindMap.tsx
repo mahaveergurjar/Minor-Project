@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import {Brain} from 'lucide-react';
+import { Brain } from "lucide-react";
+
 interface NodePosition {
   id: string;
   x: number;
@@ -24,7 +25,9 @@ interface MindMapProps {
 
 export default function MindMap({ nodes, links, central }: MindMapProps) {
   const [positions, setPositions] = useState<NodePosition[]>([]);
+  const [nodeWidths, setNodeWidths] = useState<{ [key: string]: number }>({});
   const svgRef = useRef<SVGSVGElement>(null);
+  const textMeasureRef = useRef<HTMLDivElement>(null);
 
   const colors = ["bg-blue-500", "bg-green-500", "bg-purple-500", "bg-yellow-500", "bg-red-500", "bg-pink-500"];
   const gradients = [
@@ -48,12 +51,10 @@ export default function MindMap({ nodes, links, central }: MindMapProps) {
     const levelSpacing = (width - padding * 2) / 3;
     const newPositions: NodePosition[] = [];
 
-    // Position central node
     const rootX = padding + 100;
     const rootY = height / 2;
     newPositions.push({ id: "central", x: rootX, y: rootY });
 
-    // Position main topics
     const mainTopics = nodes.filter((node) => links.some((link) => link.source === "central" && link.target === node.id));
     const mainTopicSpacing = height / (mainTopics.length + 1);
 
@@ -62,7 +63,6 @@ export default function MindMap({ nodes, links, central }: MindMapProps) {
       const y = mainTopicSpacing * (index + 1);
       newPositions.push({ id: node.id, x, y });
 
-      // Position descriptions
       const descriptions = nodes.filter((n) => links.some((link) => link.source === node.id && link.target === n.id));
       const subtopicSpacing = mainTopicSpacing / (descriptions.length + 1);
       const subtopicStartY = y - mainTopicSpacing / 2 + subtopicSpacing;
@@ -85,9 +85,19 @@ export default function MindMap({ nodes, links, central }: MindMapProps) {
     return () => window.removeEventListener("resize", calculateNodePositions);
   }, [nodes, links]);
 
-  const getNodePosition = (id: string) => {
-    return positions.find((pos) => pos.id === id);
-  };
+  useEffect(() => {
+    if (textMeasureRef.current) {
+      const newWidths: { [key: string]: number } = {};
+      nodes.forEach((node) => {
+        textMeasureRef.current!.innerText = node.label;
+        const width = Math.min(Math.max(textMeasureRef.current!.offsetWidth + 20, 80), 300);
+        newWidths[node.id] = width;
+      });
+      setNodeWidths(newWidths);
+    }
+  }, [nodes]);
+
+  const getNodePosition = (id: string) => positions.find((pos) => pos.id === id);
 
   const renderConnections = () => {
     return links.map((link, index) => {
@@ -120,13 +130,15 @@ export default function MindMap({ nodes, links, central }: MindMapProps) {
     const pos = getNodePosition(node.id);
     if (!pos) return null;
 
+    const width = nodeWidths[node.id] || 100;
+
     return (
       <React.Fragment key={node.id}>
-        <foreignObject x={pos.x - 75} y={pos.y - 20} width="250" height="20" className="overflow-visible">
+        <foreignObject x={pos.x - width / 2} y={pos.y - 20} width={width} height="40" className="overflow-visible">
           <div
-            className={`flex items-center justify-center p-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer
+            className={`flex items-center justify-center px-4 py-2 rounded-lg shadow-lg transition-all duration-300 hover:scale-105 cursor-pointer
               bg-gradient-to-r ${getGradient(index)} text-white`}
-            style={{ borderRadius: "12px", boxShadow: "3px 3px 10px rgba(0,0,0,0.2)" }}
+            style={{ minWidth: "80px", maxWidth: "300px", borderRadius: "12px", boxShadow: "3px 3px 10px rgba(0,0,0,0.2)" }}
           >
             {node.label}
           </div>
@@ -137,22 +149,21 @@ export default function MindMap({ nodes, links, central }: MindMapProps) {
 
   return (
     <>
-    
-    <div className="card-hover bg-white rounded-xl shadow-md p-6 border border-gray-200">
-      <div className="flex items-center space-x-3 bg-white rounded-lg p-3 shadow-sm">
-          <Brain className="w-6 h-6 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900">
-            Mind Map
-          </h2> 
-      </div>
+      <div ref={textMeasureRef} className="absolute invisible whitespace-nowrap px-4 py-2 font-medium"></div>
       
-      <div className="h-[1000px] bg-gray-50 rounded-lg overflow-hidden">
-        <svg ref={svgRef} className="w-full h-full">
-          {renderConnections()}
-          {nodes.map((node, index) => renderNodes(node, index))}
-        </svg>
+      <div className="card-hover bg-white rounded-xl shadow-md p-6 border border-gray-200">
+        <div className="flex items-center space-x-3 bg-white rounded-lg p-3 shadow-sm">
+          <Brain className="w-6 h-6 text-purple-600" />
+          <h2 className="text-xl font-semibold text-gray-900">Mind Map</h2>
+        </div>
+
+        <div className="h-[1400px] bg-gray-50 rounded-lg overflow-hidden">
+          <svg ref={svgRef} className="w-full h-full">
+            {renderConnections()}
+            {nodes.map((node, index) => renderNodes(node, index))}
+          </svg>
+        </div>
       </div>
-    </div>
     </>
   );
 }
