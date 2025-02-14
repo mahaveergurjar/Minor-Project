@@ -6,9 +6,11 @@ import yt_dlp
 import torch
 import os
 import spacy
-# import graphviz
+import re
+import requests
+from bs4 import BeautifulSoup
 from collections import defaultdict, Counter
-# from IPython.display import display, Image
+from IPython.display import display, Image
 
 app = Flask(__name__)
 CORS(app)
@@ -55,8 +57,8 @@ def split_audio_into_chunks(audio_file_path, chunk_length_ms=60000):
     return chunks
 
 def dynamic_tokenizer_kwargs(input_length):
-    max_length = min(1024, max(10, input_length // 2))
-    min_length = max(10, input_length // 4)
+    max_length = min(1024, max(10, input_length))
+    min_length = max(10, input_length // 2)
     return {'truncation': True, 'max_length': max_length, 'min_length': min_length}
 
 def process_audio_chunks(audio_chunks):
@@ -128,7 +130,7 @@ def extract_sentences(summary):
     doc = nlp(summary)
     return [sent.text.strip() for sent in doc.sents if sent.text.strip()]
 
-def extract_main_topics(text, top_n=6):
+def extract_main_topics(text, top_n=10):
     doc = nlp(text)
     entities = [ent.text for ent in doc.ents if ent.label_ in ['ORG', 'PERSON', 'GPE', 'LOC', 'PRODUCT']]
     entity_freq = Counter(entities)
@@ -142,15 +144,68 @@ def extract_main_topics(text, top_n=6):
 
     return main_topics
 
-def find_sentence_relations(keywords, sentences, max_sentences=5):
+def find_sentence_relations(keywords, sentences, max_sentences=1):
     keyword_sentences = defaultdict(list)
-    for sentence in sentences:
-        for keyword in keywords:
-            if keyword.lower() in sentence.lower():
-                if len(keyword_sentences[keyword]) < max_sentences:
-                    keyword_sentences[keyword].append(sentence)
+    assigned_sentences = set()  # To keep track of assigned sentences
+    
+    for keyword in keywords:
+        for sentence in sentences:
+            if len(sentence.split()) > 10 and sentence not in assigned_sentences:
+                if keyword.lower() in sentence.lower():
+                    if len(keyword_sentences[keyword]) < max_sentences:
+                        keyword_sentences[keyword].append(sentence)
+                        assigned_sentences.add(sentence)  # Mark sentence as used
+                        break  # Stop after assigning the sentence to the keyword
+    
     return keyword_sentences
 
+def get_video_title(url):
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+    return soup.title.string.replace("- YouTube", "").strip()
+
+def extract_most_frequent_title_word(title, text):
+    doc = nlp(text.lower())  # Convert to lowercase for consistency
+    words = [token.text for token in doc if token.is_alpha and not token.is_stop]  # Remove non-alphabetic words and stop words
+
+    # Tokenize title words
+    title_words = title.lower().split()
+
+    # Count occurrences of title words in transcription
+    word_freq = Counter(words)
+    common_words = {word: word_freq[word] for word in title_words if word in word_freq}
+
+    # Find the most frequent word
+    return max(common_words, key=common_words.get, default="Unknown Title")
+
+outro_patterns = [
+    r"thanks for watching", r"see you in the next video", r"don't forget to subscribe",
+    r"hit the (like|subscribe) button", r"leave a comment", r"hope you enjoyed",
+    r"follow for more", r"stay tuned", r"this was all about", r"let me know in the comments",
+    r"Welcome to this video", r"let's wrap up", r"in 100 seconds", r"this has been", r"for watching"
+]
+
+def remove_outliers(text):
+    """ Removes unwanted sentences that match outro patterns. """
+    sentences = list(nlp(text).sents)  # Segment into sentences
+    filtered_sentences = []
+
+    for sentence in sentences:
+        sentence_text = sentence.text.strip()
+        sentence_lower = sentence_text.lower()
+
+        # Skip sentences matching engagement/outro phrases
+        if any(re.search(pattern, sentence_lower) for pattern in outro_patterns):
+            continue
+
+        # Skip very short sentences (likely irrelevant)
+        if len(sentence_text.split()) < 4: 
+            continue
+
+        filtered_sentences.append(sentence_text)
+
+    return filtered_sentences
 
 @app.route("/summarize", methods=["POST"])
 def summarize_video():
@@ -163,35 +218,68 @@ def summarize_video():
         download_audio(video_url)
         audio_file_path = "downloaded_audio.wav"
         chunks = split_audio_into_chunks(audio_file_path)
-        all_summaries = process_audio_chunks(chunks)
+
+        # Store full transcription text
+        transcription = []
+
+        for chunk in chunks:
+            text = asr_pipe(chunk)["text"]
+            transcription.append(text)  # Store each chunk
+        transcription = " ".join(transcription)  # Join all transcriptions
+
+
+
+        full_transcription = []
+
+        cleaned_sentences = remove_outliers(transcription)
+
+        for sent in cleaned_sentences:
+            full_transcription.append(sent)
+        
+        full_transcription = " ".join(full_transcription)
+        
+
+        # Summarization
+        all_summaries = []
+        for text in full_transcription.split("\n"):
+            if text.strip():
+                input_length = len(text.split())
+                tokenizer_kwargs = dynamic_tokenizer_kwargs(input_length)
+                summary = summarizer(text, do_sample=False, **tokenizer_kwargs)
+                all_summaries.append(summary[0]['summary_text'])
+
+        # Cleanup
         os.remove(audio_file_path)
         for chunk in chunks:
             os.remove(chunk)
-        
+
         full_summary = " ".join(all_summaries)
-        mind_map_data = generate_mind_map(full_summary)
-        points = extract_sentences(full_summary)
+        points = extract_sentences(full_transcription)
         text_data = "\n".join(points)
+        print(text_data)
 
         # Extract main topics (keywords)
         main_topics = extract_main_topics(text_data)
+        print(main_topics)
+
+        #central topic finding
+        video_title = get_video_title(video_url)
+        most_frequent_word = extract_most_frequent_title_word(video_title, full_transcription)
+
 
         # Find relationships between keywords and sentences
         keyword_sentences = find_sentence_relations(main_topics, points)
-        topic = extract_topic(full_summary)
-
-        print(topic)
-        print(keyword_sentences)
 
         return jsonify({
+            "transcription": full_transcription,  # Store the full transcription
             "summary": full_summary,
             "mind_map": keyword_sentences,
-            # "keyValue": keyword_sentences,
-            "central": topic
+            "central": most_frequent_word
         })
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(port=5000)
