@@ -1,4 +1,4 @@
-# 🎥 YouTube Video Summarizer 📜
+# 🎥 YouTube Video Summarizer 📝
 
 A web application that extracts audio from YouTube videos, transcribes it using **OpenAI Whisper**, and generates a concise summary using **DistilBART**.
 
@@ -12,7 +12,7 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 
 ---
 
-## 🛠️ Tech Stack
+## 🫠 Tech Stack
 
 ### **Backend**
 
@@ -46,8 +46,8 @@ cd Minor-Project
 #### Install Dependencies
 
 ```sh
-cd beckend
-pip install flask transformers torch pydub yt-dlp flask-cors
+cd backend
+pip install -r requirements.txt
 ```
 
 #### Run Flask Server
@@ -85,7 +85,7 @@ npm run dev
 
 ## 📌 API Endpoints
 
-### 🎙️ **Summarize Video**
+### 🎹 **Summarize Video**
 
 - **Endpoint:** `POST /summarize`
 - **Payload:**
@@ -136,3 +136,4 @@ Want to improve this project? Contributions are welcome!
 - [OpenAI Whisper](https://openai.com/whisper)
 - [Hugging Face Transformers](https://huggingface.co/)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
+
