@@ -1,12 +1,13 @@
 # 🎥 YouTube Video Summarizer 📝
 
-A web application that extracts audio from YouTube videos, transcribes it using **OpenAI Whisper**, and generates a concise summary using **DistilBART**.
+A web application that extracts audio from YouTube videos, transcribes it using **OpenAI Whisper**, and generates a concise summary using **DistilBART** with **multilingual support**.
 
 ## 🚀 Features
 
 ✅ Download audio from YouTube videos 🎵  
 ✅ Convert speech to text with **Whisper** 🤖  
 ✅ Summarize the transcribed text using **DistilBART** 📄  
+✅ **Multilingual support** for summaries in multiple languages 🌎  
 ✅ REST API built with **Flask**  
 ✅ Frontend powered by **React + Vite**
 
@@ -21,6 +22,7 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 - Transformers (Whisper + DistilBART)
 - PyDub (Audio Processing)
 - yt-dlp (YouTube Audio Download)
+- Helsinki-NLP Translation Models
 - Flask-CORS
 
 ### **Frontend**
@@ -29,6 +31,7 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 - TailwindCSS 🎨
 - Axios (API Requests)
 - Lucide-react (Icons)
+- Language selection component
 
 ---
 
@@ -80,6 +83,7 @@ npm run dev
 1. Enter a YouTube video URL in the frontend UI.
 2. The Flask backend downloads the audio and processes the text.
 3. The summarized text is displayed on the frontend.
+4. Select your preferred language from the dropdown to view the summary in that language.
 
 ---
 
@@ -102,6 +106,26 @@ npm run dev
 }
 ```
 
+### 🌐 **Translate Summary**
+
+- **Endpoint:** `POST /translate`
+- **Payload:**
+
+```json
+{ 
+  "text": "This is the text to be translated", 
+  "language": "fr" 
+}
+```
+
+- **Response:**
+
+```json
+{
+  "translated_summary": "Voici le texte traduit"
+}
+```
+
 ---
 
 ## ⚠️ Requirements
@@ -112,11 +136,23 @@ npm run dev
 
 ---
 
+## 🌐 Supported Languages
+
+The application currently supports the following languages:
+- English (en)
+- Spanish (es)
+- French (fr)
+- German (de)
+- Hindi (hi)
+
+---
+
 ## 🤖 Future Improvements
 
-- Add **multi-language support** 🌍
+- Add **more language options** 🌍
 - Improve **UI with better visualization** 🎨
 - Optimize **processing speed** ⚡
+- Add **sentiment analysis** of video content 📊
 
 ---
 
@@ -135,5 +171,5 @@ Want to improve this project? Contributions are welcome!
 
 - [OpenAI Whisper](https://openai.com/whisper)
 - [Hugging Face Transformers](https://huggingface.co/)
+- [Helsinki-NLP Translation Models](https://huggingface.co/Helsinki-NLP)
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp)
-
