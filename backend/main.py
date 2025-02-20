@@ -12,11 +12,17 @@ from bs4 import BeautifulSoup
 from collections import defaultdict, Counter
 from IPython.display import display, Image
 
+
+
 app = Flask(__name__)
 CORS(app)
 
 # Initialize device and pipelines
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+
+# Initialize translation pipeline (Change 'Helsinki-NLP/opus-mt-en-fr' to the desired language pair)
+translator = pipeline("translation", model="Helsinki-NLP/opus-mt-en-fr")
 
 asr_pipe = pipeline(
     "automatic-speech-recognition",
@@ -279,6 +285,35 @@ def summarize_video():
     
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+
+@app.route("/translate", methods=["POST"])
+def translate_text():
+    try:
+        data = request.get_json()
+        print("Received translation request:", data)  # Debugging input request
+
+        text = data.get("text")
+        target_language = data.get("language")  # Expected as "fr" for French, "es" for Spanish, etc.
+
+        if not text or not target_language:
+            print("Error: Missing text or target language")  # Debugging missing input
+            return jsonify({"error": "Missing text or target language"}), 400
+
+        # Load appropriate translation model dynamically
+        model_name = f"Helsinki-NLP/opus-mt-en-{target_language}"
+        print(f"Loading translation model: {model_name}")  # Debugging model selection
+
+        translator = pipeline("translation", model=model_name)
+
+        translated_text = translator(text, max_length=500)[0]["translation_text"]
+        print("Translation successful:", translated_text)  # Debugging translation output
+
+        return jsonify({"translated_summary": translated_text})
+    
+    except Exception as e:
+        print("Translation error:", str(e))  # Debugging exceptions
+        return jsonify({"error": str(e)}), 500   
 
 
 if __name__ == "__main__":
