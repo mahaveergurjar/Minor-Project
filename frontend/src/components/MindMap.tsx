@@ -157,7 +157,7 @@ export default function MindMap({ nodes, links, central }: MindMapProps) {
           <h2 className="text-xl font-semibold text-gray-900">Mind Map</h2>
         </div>
 
-        <div className="h-[1400px] bg-gray-50 rounded-lg overflow-hidden">
+        <div className="h-[1600px] bg-gray-50 rounded-lg overflow-hidden">
           <svg ref={svgRef} className="w-full h-full">
             {renderConnections()}
             {nodes.map((node, index) => renderNodes(node, index))}
