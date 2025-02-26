@@ -206,21 +206,37 @@ def remove_outliers(text):
             continue
 
         # Skip very short sentences (likely irrelevant)
-        if len(sentence_text.split()) < 4: 
+        if len(sentence_text.split()) < 4:
             continue
 
         filtered_sentences.append(sentence_text)
 
     return filtered_sentences
 
+def translate_text(text, target_language="es"):
+    try:
+        result = translator.translate(text, dest=target_language)
+        return result.text
+    except Exception as e:
+        print("Translation Error:", str(e))
+        return text  # Return the original text if translation fails
+
+
 @app.route("/summarize", methods=["POST"])
 def summarize_video():
     try:
         data = request.get_json()
+        print("Received Data:", data)
         video_url = data.get("video_url")
         if not video_url:
             return jsonify({"error": "Missing video_url"}), 400
         
+        target_language = data.get("lang")
+        if not target_language:
+            return jsonify({"error": "Missing target language"}), 400
+
+        print("Target Language:", target_language)
+
         download_audio(video_url)
         audio_file_path = "downloaded_audio.wav"
         chunks = split_audio_into_chunks(audio_file_path)
@@ -241,9 +257,9 @@ def summarize_video():
 
         for sent in cleaned_sentences:
             full_transcription.append(sent)
-        
+
         full_transcription = " ".join(full_transcription)
-        
+
 
         # Summarization
         all_summaries = []
@@ -262,11 +278,9 @@ def summarize_video():
         full_summary = " ".join(all_summaries)
         points = extract_sentences(full_transcription)
         text_data = "\n".join(points)
-        print(text_data)
 
         # Extract main topics (keywords)
         main_topics = extract_main_topics(text_data)
-        print(main_topics)
 
         #central topic finding
         video_title = get_video_title(video_url)
@@ -276,45 +290,22 @@ def summarize_video():
         # Find relationships between keywords and sentences
         keyword_sentences = find_sentence_relations(main_topics, points)
 
+
+
+        translated_summary = translate_text(full_summary, target_language)
+        translated_transcription = translate_text(text_data, target_language)
+       
+
         return jsonify({
-            "transcription": full_transcription,  # Store the full transcription
-            "summary": full_summary,
+            "summary": translated_summary,
+            "transcription": translated_transcription,  # Store the full transcription
             "mind_map": keyword_sentences,
             "central": most_frequent_word
         })
-    
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
     
-
-@app.route("/translate", methods=["POST"])
-def translate_text():
-    try:
-        data = request.get_json()
-        print("Received translation request:", data)  # Debugging input request
-
-        text = data.get("text")
-        target_language = data.get("language")  # Expected as "fr" for French, "es" for Spanish, etc.
-
-        if not text or not target_language:
-            print("Error: Missing text or target language")  # Debugging missing input
-            return jsonify({"error": "Missing text or target language"}), 400
-
-        # Load appropriate translation model dynamically
-        model_name = f"Helsinki-NLP/opus-mt-en-{target_language}"
-        print(f"Loading translation model: {model_name}")  # Debugging model selection
-
-        translator = pipeline("translation", model=model_name)
-
-        translated_text = translator(text, max_length=500)[0]["translation_text"]
-        print("Translation successful:", translated_text)  # Debugging translation output
-
-        return jsonify({"translated_summary": translated_text})
-    
-    except Exception as e:
-        print("Translation error:", str(e))  # Debugging exceptions
-        return jsonify({"error": str(e)}), 500   
-
-
 if __name__ == "__main__":
     app.run(port=5000)

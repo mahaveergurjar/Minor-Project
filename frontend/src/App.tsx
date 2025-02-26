@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { VideoInput } from "./components/VideoInput";
 import { Transcript } from './components/Transcript';
 import { Summary } from "./components/Summary";
 import MindMap from "./components/MindMap";
-import { analyzeVideo, translateSummary } from "./api";
+import { analyzeVideo } from "./api";
 import { Youtube, Sparkles, Loader2 } from "lucide-react";
 import LanguageSelector from "./components/LanguageSelector";
 
@@ -12,23 +12,14 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
-  const [translatedSummary, setTranslatedSummary] = useState<string | null>(null);
 
-  // Add this effect to handle language changes
-  useEffect(() => {
-    if (videoData?.summary && selectedLanguage !== "en") {
-      handleTranslateSummary(videoData.summary, selectedLanguage);
-    } else if (selectedLanguage === "en") {
-      // Reset to original summary when switching back to English
-      setTranslatedSummary(null);
-    }
-  }, [selectedLanguage, videoData]);
+  
 
   const handleVideoSubmit = async (url: string) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await analyzeVideo(url);
+      const data = await analyzeVideo(url,selectedLanguage);
 
       // Create central node
       const centralNode = { id: "central", label: data.central };
@@ -63,18 +54,13 @@ function App() {
 
       setVideoData({
         summary: data.summary,
-        transcript: data.transcript,
+        transcript: data.transcription,
         mindMap: {
           central: data.central,
           nodes: [centralNode, ...keywordNodes, ...descriptionNodes],
           links: [...keywordLinks, ...descriptionLinks],
         },
       });
-
-      // Only translate if not English
-      if (selectedLanguage !== "en") {
-        handleTranslateSummary(data.summary, selectedLanguage);
-      }
     } catch (err) {
       setError("Failed to analyze video. Please try again.");
       console.error(err);
@@ -83,18 +69,7 @@ function App() {
     }
   };
 
-  const handleTranslateSummary = async (summary: string, language: string) => {
-    console.log(`Translating to ${language}:`, summary.substring(0, 30) + "...");
-    
-    try {
-      const translatedData = await translateSummary(summary, language);
-      console.log("Translation response:", translatedData);
-      setTranslatedSummary(translatedData.translated_summary);
-    } catch (err) {
-      console.error("Translation failed:", err);
-      setTranslatedSummary(null);
-    }
-  };
+  
 
   return (
     <div className="min-h-screen gradient-bg">
@@ -133,8 +108,7 @@ function App() {
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-5">
               <Summary 
-                summary={selectedLanguage === "en" ? videoData.summary : (translatedSummary || videoData.summary)} 
-                isTranslated={selectedLanguage !== "en" && !!translatedSummary}
+                summary={videoData.summary}
               />
               <Transcript transcript={videoData?.transcript || "Transcript not available"} />
             </div>
