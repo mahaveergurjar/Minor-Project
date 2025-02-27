@@ -1,50 +1,50 @@
 import React, { useState } from "react";
 import { VideoInput } from "./components/VideoInput";
-import { Transcript } from './components/Transcript';
+import { Transcript } from "./components/Transcript";
 import { Summary } from "./components/Summary";
 import MindMap from "./components/MindMap";
 import { analyzeVideo } from "./api";
 import { Youtube, Sparkles, Loader2 } from "lucide-react";
 import LanguageSelector from "./components/LanguageSelector";
 
+interface VideoData {
+  summary: string;
+  transcript: string;
+  mindMap: {
+    central: string;
+    nodes: { id: string; label: string }[];
+    links: { source: string; target: string }[];
+  };
+}
+
 function App() {
-  const [videoData, setVideoData] = useState<any>(null);
+  const [videoData, setVideoData] = useState<VideoData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<string>("en");
 
-  
-
-  const handleVideoSubmit = async (url: string) => {
+  const handleVideoSubmit = async (url: string, summaryLength: string) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await analyzeVideo(url,selectedLanguage);
+      const data = await analyzeVideo(url, selectedLanguage, summaryLength);
 
-      // Create central node
+      // Mind map generation
       const centralNode = { id: "central", label: data.central };
-
-      // Create keyword nodes
       const keywordNodes = Object.keys(data.mind_map).map((key, index) => ({
         id: `node-${index}`,
         label: key,
       }));
-
-      // Create description nodes
       const descriptionNodes = Object.keys(data.mind_map).flatMap((key, index) =>
         data.mind_map[key].map((desc, descIndex) => ({
           id: `desc-${index}-${descIndex}`,
           label: desc,
         }))
       );
-
-      // Create links from central node to keywords
       const keywordLinks = keywordNodes.map((node) => ({
         source: "central",
         target: node.id,
       }));
-
-      // Create links from keywords to descriptions
       const descriptionLinks = Object.keys(data.mind_map).flatMap((key, index) =>
         data.mind_map[key].map((_, descIndex) => ({
           source: `node-${index}`,
@@ -69,8 +69,6 @@ function App() {
     }
   };
 
-  
-
   return (
     <div className="min-h-screen gradient-bg">
       <header className="glass-effect sticky top-0 z-50 border-b border-gray-200">
@@ -84,7 +82,9 @@ function App() {
             </div>
             <div className="flex items-center space-x-4">
               <Sparkles className="w-5 h-5 text-yellow-500" />
-              <span className="text-sm font-medium text-gray-600">AI-Powered Analysis</span>
+              <span className="text-sm font-medium text-gray-600">
+                AI-Powered Analysis
+              </span>
               <LanguageSelector selectedLanguage={selectedLanguage} setSelectedLanguage={setSelectedLanguage} />
             </div>
           </div>
@@ -92,7 +92,15 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <VideoInput onSubmit={handleVideoSubmit} disabled={loading} />
+        <div className="glass-effect rounded-xl p-6 mb-8 shadow-md">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+            <div className="flex-1">
+              <VideoInput onSubmit={handleVideoSubmit} disabled={loading} />
+              
+            </div>
+          </div>
+        </div>
+        
         {error && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
             {error}
@@ -107,9 +115,7 @@ function App() {
         {videoData && !loading && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-5">
-              <Summary 
-                summary={videoData.summary}
-              />
+              <Summary summary={videoData.summary} />
               <Transcript transcript={videoData?.transcript || "Transcript not available"} />
             </div>
             <div className="mt-4">

@@ -17,7 +17,7 @@ export function Transcript({ transcript }: TranscriptProps) {
       </h2>
 
       <div className="max-h-96 overflow-y-auto custom-scrollbar">
-        <ul className="list-disc pl-6 text-gray-700 leading-relaxed">
+        <ul className="list-disc pl-6 text-gray-800 leading-relaxed">
           {bulletPoints.map((point, index) => (
             <li key={index} className="ml-4">{point.trim()}</li>
           ))}

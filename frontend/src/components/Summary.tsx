@@ -15,7 +15,7 @@ export function Summary({ summary }: SummaryProps) {
         <h2 className="text-xl font-semibold text-gray-900">Summary</h2>
         
       </div>
-      <div className="prose max-w-none" id="summary-content">
+      <div className="prose max-w-none text-gray-900 leading-relaxed" id="summary-content">
         <ReactMarkdown>{summary}</ReactMarkdown>
       </div>
     </div>
