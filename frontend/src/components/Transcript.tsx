@@ -6,7 +6,7 @@ interface TranscriptProps {
 }
 
 export function Transcript({ transcript }: TranscriptProps) {
-  const bulletPoints = transcript.split('\n').filter(line => line.trim() !== '');
+  const bulletPoints = transcript.split('.').filter(line => line.trim() !== '');
 
   return (
     <div className="card-hover bg-white rounded-xl shadow-sm p-6 border border-gray-100">

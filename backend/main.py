@@ -1,6 +1,3 @@
-from flask import Flask, request, jsonify
-from transformers import pipeline
-from flask_cors import CORS
 from pydub import AudioSegment
 import yt_dlp
 import torch
@@ -12,17 +9,16 @@ from bs4 import BeautifulSoup
 from collections import defaultdict, Counter
 from IPython.display import display, Image
 
+from googletrans import Translator
 
+translator = Translator()
 
 app = Flask(__name__)
+
 CORS(app)
 
 # Initialize device and pipelines
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-
-# Initialize translation pipeline (Change 'Helsinki-NLP/opus-mt-en-fr' to the desired language pair)
-translator = pipeline("translation", model="Helsinki-NLP/opus-mt-en-fr")
 
 asr_pipe = pipeline(
     "automatic-speech-recognition",
@@ -62,29 +58,39 @@ def split_audio_into_chunks(audio_file_path, chunk_length_ms=60000):
         chunks.append(chunk_path)
     return chunks
 
-def dynamic_tokenizer_kwargs(input_length):
-    max_length = min(1024, max(10, input_length))
-    min_length = max(10, input_length // 2)
+def dynamic_tokenizer_kwargs(input_length,length):
+    max_length = min(1024, max(10, input_length // length))
+    min_length = max(10, input_length // (2*length))
     return {'truncation': True, 'max_length': max_length, 'min_length': min_length}
 
-def process_audio_chunks(audio_chunks):
-    texts = [asr_pipe(chunk)["text"] for chunk in audio_chunks]
+
+def summarize_text(text, length):
+    """Summarizes the given text after cleaning and chunking."""
+    cleaned_sentences = remove_outliers(text)  # Remove unnecessary sentences
+    full_transcription = " ".join(cleaned_sentences)
+
     summaries = []
-    for text in texts:
-        input_length = len(text.split())
-        tokenizer_kwargs = dynamic_tokenizer_kwargs(input_length)
-        summary = summarizer(text, do_sample=False, **tokenizer_kwargs)
+    chunk_size = 300  # Summarization works best on ~300 words
+    words = full_transcription.split()
+
+    for i in range(0, len(words), chunk_size):
+        chunk = " ".join(words[i:i + chunk_size])
+        input_length = len(chunk.split())
+        tokenizer_kwargs = dynamic_tokenizer_kwargs(input_length, length)
+        summary = summarizer(chunk, do_sample=False, **tokenizer_kwargs)
         summaries.append(summary[0]['summary_text'])
-    return summaries
+
+    return " ".join(summaries), full_transcription
+
 
 def generate_mind_map(summary_text):
     doc = nlp(summary_text)
     nodes = []
     links = []
     keyword_map = defaultdict(set)
-    
+
     main_topics = set()
-    
+
     # Extract key topics and relationships
     for token in doc:
         if token.pos_ in ["NOUN", "PROPN"]:  # Focus on nouns & proper nouns
@@ -153,7 +159,7 @@ def extract_main_topics(text, top_n=10):
 def find_sentence_relations(keywords, sentences, max_sentences=1):
     keyword_sentences = defaultdict(list)
     assigned_sentences = set()  # To keep track of assigned sentences
-    
+
     for keyword in keywords:
         for sentence in sentences:
             if len(sentence.split()) > 10 and sentence not in assigned_sentences:
@@ -162,7 +168,7 @@ def find_sentence_relations(keywords, sentences, max_sentences=1):
                         keyword_sentences[keyword].append(sentence)
                         assigned_sentences.add(sentence)  # Mark sentence as used
                         break  # Stop after assigning the sentence to the keyword
-    
+
     return keyword_sentences
 
 def get_video_title(url):
@@ -189,7 +195,7 @@ outro_patterns = [
     r"thanks for watching", r"see you in the next video", r"don't forget to subscribe",
     r"hit the (like|subscribe) button", r"leave a comment", r"hope you enjoyed",
     r"follow for more", r"stay tuned", r"this was all about", r"let me know in the comments",
-    r"Welcome to this video", r"let's wrap up", r"in 100 seconds", r"this has been", r"for watching"
+    r"Welcome to this video", r"let's wrap up", r"in 100 seconds", r"this has been", r"for watching", r"video"
 ]
 
 def remove_outliers(text):
@@ -222,83 +228,68 @@ def translate_text(text, target_language="es"):
         return text  # Return the original text if translation fails
 
 
+
+
+@app.route("/")
+def home():
+    return "Hello, Flask is running on Colab!"
+
 @app.route("/summarize", methods=["POST"])
 def summarize_video():
     try:
         data = request.get_json()
-        print("Received Data:", data)
         video_url = data.get("video_url")
         if not video_url:
             return jsonify({"error": "Missing video_url"}), 400
-        
+
         target_language = data.get("lang")
         if not target_language:
             return jsonify({"error": "Missing target language"}), 400
 
-        print("Target Language:", target_language)
+        # Determine summary length
+        summary_length = data.get("summary_length", "Normal")
+        length = {"Short": 3, "Normal": 2, "Long": 1}.get(summary_length, 2)
 
+        # Download and split audio
         download_audio(video_url)
         audio_file_path = "downloaded_audio.wav"
         chunks = split_audio_into_chunks(audio_file_path)
 
-        # Store full transcription text
-        transcription = []
-
-        for chunk in chunks:
-            text = asr_pipe(chunk)["text"]
-            transcription.append(text)  # Store each chunk
-        transcription = " ".join(transcription)  # Join all transcriptions
-
-
-
-        full_transcription = []
-
-        cleaned_sentences = remove_outliers(transcription)
-
-        for sent in cleaned_sentences:
-            full_transcription.append(sent)
-
-        full_transcription = " ".join(full_transcription)
-
+        # Perform transcription
+        transcription = " ".join([asr_pipe(chunk)["text"] for chunk in chunks])
 
         # Summarization
-        all_summaries = []
-        for text in full_transcription.split("\n"):
-            if text.strip():
-                input_length = len(text.split())
-                tokenizer_kwargs = dynamic_tokenizer_kwargs(input_length)
-                summary = summarizer(text, do_sample=False, **tokenizer_kwargs)
-                all_summaries.append(summary[0]['summary_text'])
+        full_summary, full_transcription = summarize_text(transcription, length)
+
+        points = extract_sentences(full_transcription)
+        text_data = "\n".join(points)
+       
+        # Extract main topics (keywords)
+        main_topics = extract_main_topics(text_data)
+
+        # Determine central topic
+        video_title = get_video_title(video_url)
+        most_frequent_word = extract_most_frequent_title_word(video_title, full_transcription)
+
+        # Find sentence relations for mind map
+        keyword_sentences = find_sentence_relations(main_topics, points)
+
+        # Translation (if needed)
+        if target_language != "en":
+            full_summary = translate_text(full_summary, target_language)
+            full_transcription = translate_text(full_transcription, target_language)
 
         # Cleanup
         os.remove(audio_file_path)
         for chunk in chunks:
             os.remove(chunk)
 
-        full_summary = " ".join(all_summaries)
-        points = extract_sentences(full_transcription)
-        text_data = "\n".join(points)
+        print(len(full_summary))
 
-        # Extract main topics (keywords)
-        main_topics = extract_main_topics(text_data)
-
-        #central topic finding
-        video_title = get_video_title(video_url)
-        most_frequent_word = extract_most_frequent_title_word(video_title, full_transcription)
-
-
-        # Find relationships between keywords and sentences
-        keyword_sentences = find_sentence_relations(main_topics, points)
-
-
-
-        translated_summary = translate_text(full_summary, target_language)
-        translated_transcription = translate_text(text_data, target_language)
-       
 
         return jsonify({
-            "summary": translated_summary,
-            "transcription": translated_transcription,  # Store the full transcription
+            "summary": full_summary,
+            "transcription": full_transcription,
             "mind_map": keyword_sentences,
             "central": most_frequent_word
         })
@@ -306,6 +297,8 @@ def summarize_video():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    
+
 if __name__ == "__main__":
     app.run(port=5000)
+
+    

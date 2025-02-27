@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Backend API URLs
-const API_URL = 'https://bed3-34-23-195-222.ngrok-free.app/summarize';
+const API_URL = 'http://localhost:5000/summarize';
 
 // Function to analyze video
 export const analyzeVideo = async (videoUrl: string, language: string, summaryLength: string ) => {
