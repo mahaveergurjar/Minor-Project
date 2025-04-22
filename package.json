@@ -1,0 +1,22 @@
+{
+  "name": "minor-project",
+  "version": "1.0.0",
+  "description": "A web application that extracts audio from YouTube videos, transcribes it using **OpenAI Whisper**, and generates a concise summary using **DistilBART** with **multilingual support**.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "lucide-react": "^0.501.0",
+    "react-router-dom": "^7.5.1",
+    "react-toastify": "^11.0.5",
+    "typescript": "^5.8.3",
+    "utils": "^0.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2"
+  }
+}
