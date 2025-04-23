@@ -14,5 +14,4 @@ const ensureAuthenticated = (req, res, next) => {
             .json({ message: 'Unauthorized, JWT token wrong or expired' });
     }
 }
-
 module.exports = ensureAuthenticated;
