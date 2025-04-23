@@ -8,7 +8,6 @@ import requests
 from bs4 import BeautifulSoup
 from collections import defaultdict, Counter
 from IPython.display import display, Image
-
 from googletrans import Translator
 
 translator = Translator()
