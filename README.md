@@ -10,7 +10,7 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 ✅ **Multilingual support** for summaries in multiple languages 🌎  
 ✅ REST API built with **Flask**  
 ✅ Frontend powered by **React + Vite**
-✅ Provides **Authorization** to the application 
+
 ---
 
 ## 🫠 Tech Stack
@@ -24,9 +24,7 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 - yt-dlp (YouTube Audio Download)
 - Helsinki-NLP Translation Models
 - Flask-CORS
-- Express.js
-- Node.js
-- Mongoose
+
 ### **Frontend**
 
 - React ⚛️
@@ -53,14 +51,12 @@ cd Minor-Project
 ```sh
 cd backend
 pip install -r requirements.txt
-npm intall mongoose express express-validator cors body-parser dotenv
-joi jsonwebtoken bcrypt
 ```
 
 #### Run Flask Server
 
 ```sh
-npm start
+python main.py
 ```
 
 ---
@@ -157,7 +153,7 @@ The application currently supports the following languages:
 - Improve **UI with better visualization** 🎨
 - Optimize **processing speed** ⚡
 - Add **sentiment analysis** of video content 📊
-- Add more **security** to the application 
+
 ---
 
 ## ✨ Contributing
