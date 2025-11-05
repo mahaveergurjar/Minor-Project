@@ -4,13 +4,13 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 
 ## 🚀 Features
 
-✅ Provides **Authorization** to the application 
 ✅ Download audio from YouTube videos 🎵  
 ✅ Convert speech to text with **Whisper** 🤖  
 ✅ Summarize the transcribed text using **DistilBART** 📄  
 ✅ **Multilingual support** for summaries in multiple languages 🌎  
 ✅ REST API built with **Flask**  
 ✅ Frontend powered by **React + Vite**
+✅ Provides **Authorization** to the application 
 
 ---
 
