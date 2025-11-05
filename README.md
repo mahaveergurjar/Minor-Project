@@ -11,7 +11,6 @@ A web application that extracts audio from YouTube videos, transcribes it using 
 ✅ REST API built with **Flask**  
 ✅ Frontend powered by **React + Vite**
 ✅ Provides **Authorization** to the application 
-
 ---
 
 ## 🫠 Tech Stack
